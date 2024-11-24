@@ -1,27 +1,25 @@
-pub use log::LevelFilter;
-use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{
+  error::Error as StdError,
   fs::{self, File},
   path::PathBuf,
+  result::Result as StdResult,
 };
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+use chrono::Local;
+
+use fern::{
+  colors::{Color, ColoredLevelConfig},
+  Dispatch,
+};
+
+pub use log::Level as LogLevel;
+use log::LevelFilter;
+
+pub type Result<T> = StdResult<T, Box<dyn StdError>>;
 
 const DEFAULT_MAX_FILE_SIZE: u128 = 1024 * 1024;
 
-/// The available verbosity levels of the logger.
-#[derive(Deserialize_repr, Serialize_repr, Debug, Clone)]
-#[repr(u16)]
-pub enum LogLevel {
-  Trace = 1,
-  Debug,
-  Info,
-  Warn,
-  Error,
-}
-
 /// Targets of the logs.
-#[allow(dead_code)]
 pub enum LogTarget {
   /// Log to console.
   Console,
@@ -46,12 +44,11 @@ impl LoggerBuilder {
     Self { level: LevelFilter::Trace, max_file_size: DEFAULT_MAX_FILE_SIZE, targets: Vec::new() }
   }
 
-  pub fn level(mut self, level: LevelFilter) -> Self {
-    self.level = level;
+  pub fn level(mut self, level: LogLevel) -> Self {
+    self.level = level.to_level_filter();
     self
   }
 
-  #[allow(dead_code)]
   pub fn max_file_size(mut self, max_file_size: u128) -> Self {
     self.max_file_size = max_file_size;
     self
@@ -72,17 +69,17 @@ impl LoggerBuilder {
   }
 
   fn apply(logger: &Logger) -> Result<()> {
-    let mut dispatch = fern::Dispatch::new()
-      // Perform allocation-free log formatting
-      .format(|out, message, record| {
+    let colors = ColoredLevelConfig::new().info(Color::Blue).warn(Color::Yellow).error(Color::Red);
+    let mut dispatch = Dispatch::new()
+      .format(move |out, message, record| {
         let line = match record.line() {
           Some(line) => line,
           None => 0,
         };
         out.finish(format_args!(
           "[{}]<{}>[{}:{}] {}",
-          chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-          record.level(),
+          Local::now().format("%Y-%m-%d %H:%M:%S"),
+          colors.color(record.level()),
           record.target(),
           line,
           message
@@ -103,7 +100,9 @@ impl LoggerBuilder {
         }
       };
     }
+
     dispatch.apply()?;
+
     Ok(())
   }
 
