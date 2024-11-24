@@ -69,7 +69,10 @@ impl LoggerBuilder {
   }
 
   fn apply(logger: &Logger) -> Result<()> {
-    let colors = ColoredLevelConfig::new().info(Color::Blue).warn(Color::Yellow).error(Color::Red);
+    let colors = ColoredLevelConfig::new()
+      .info(Color::BrightBlue)
+      .warn(Color::BrightYellow)
+      .error(Color::BrightRed);
     let mut dispatch = Dispatch::new()
       .format(move |out, message, record| {
         let line = match record.line() {
